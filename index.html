@@ -47,6 +47,7 @@
       <button id="vrBtn" type="button" disabled>Enter VR</button>
       <button id="installBtn" type="button" style="display:none;">Install App</button>
       <div class="title">Brought to you by Cambridge VR</div>
+      <div class="title" style="font-size:0.75rem; opacity:0.7; margin-top:-0.2rem;">v2.0</div>
     </div>
   </div>
 
@@ -173,12 +174,138 @@
     const installBtn=document.getElementById('installBtn');
     const fileInput=document.getElementById('file');
 
-    selectBtn.addEventListener('click',()=>{ fileInput.value=''; if(fileInput.showPicker){try{fileInput.showPicker();return;}catch{}} fileInput.click(); });
+    // === List container for mp4 files (JS-only UI) ===
+    const fileListContainer = document.createElement('div');
+    fileListContainer.id = 'fileList';
+    fileListContainer.style.maxHeight = '220px';
+    fileListContainer.style.overflowY = 'auto';
+    fileListContainer.style.fontSize = '.9rem';
+    fileListContainer.style.width = '220px';
+    fileListContainer.style.textAlign = 'left';
+    fileListContainer.style.marginTop = '0.25rem';
+    ui.appendChild(fileListContainer);
+
+    // === Original file-input behavior as fallback ===
+    function useFileInputFallback(){
+      fileInput.value='';
+      if(fileInput.showPicker){
+        try{
+          fileInput.showPicker();
+          return;
+        }catch(e){}
+      }
+      fileInput.click();
+    }
+
     fileInput.addEventListener('change',e=>{
       const f=e.target.files[0]; if(!f)return;
       video.src=URL.createObjectURL(f);
       video.muted=true;
       video.play().then(()=>vrBtn.disabled=false).catch(()=>{});
+    });
+
+    // === Directory-based mp4 listing using File System Access API ===
+    let dirHandle = null;
+    let videoFiles = [];
+
+    async function pickDirectory(){
+      if(!window.showDirectoryPicker) return null;
+      try{
+        // User chooses their Downloads folder here
+        const handle = await window.showDirectoryPicker({
+          id: 'vr-explorer-downloads'
+        });
+        return handle;
+      }catch(e){
+        // User cancelled or error
+        return null;
+      }
+    }
+
+    async function loadDirectoryFiles(){
+      if(!dirHandle){
+        dirHandle = await pickDirectory();
+        if(!dirHandle){
+          // Could not pick a folder → fallback to classic file picker
+          useFileInputFallback();
+          return;
+        }
+      }
+
+      const files = [];
+      try{
+        for await (const [name, handle] of dirHandle.entries()){
+          if(handle.kind === 'file' && name.toLowerCase().endsWith('.mp4')){
+            files.push({ name, handle });
+          }
+        }
+      }catch(e){
+        // Any error reading the directory → fallback
+        useFileInputFallback();
+        return;
+      }
+
+      // Sort by name
+      files.sort((a,b)=>a.name.localeCompare(b.name, undefined, { numeric:true, sensitivity:'base' }));
+      videoFiles = files;
+      renderFileList();
+    }
+
+    function renderFileList(){
+      fileListContainer.innerHTML = '';
+
+      if(!videoFiles.length){
+        fileListContainer.textContent = 'No .mp4 files found in this folder.';
+        return;
+      }
+
+      const list = document.createElement('ul');
+      list.style.listStyle = 'none';
+      list.style.padding = '0';
+      list.style.margin = '0';
+
+      videoFiles.forEach((fileObj, index)=>{
+        const li = document.createElement('li');
+        li.style.padding = '.25rem 0';
+        li.style.cursor = 'pointer';
+
+        // Hide .mp4 extension for display
+        const displayName = fileObj.name.replace(/\.mp4$/i, '');
+
+        li.textContent = displayName;
+
+        li.addEventListener('click', () => {
+          selectVideoFromList(index);
+        });
+
+        list.appendChild(li);
+      });
+
+      fileListContainer.appendChild(list);
+    }
+
+    async function selectVideoFromList(index){
+      const fileObj = videoFiles[index];
+      if(!fileObj) return;
+      try{
+        const file = await fileObj.handle.getFile();
+        const url = URL.createObjectURL(file);
+        video.src = url;
+        video.muted = true;
+        video.play().then(()=>{ vrBtn.disabled = false; }).catch(()=>{});
+      }catch(e){
+        console.error('Failed to load selected video:', e);
+      }
+    }
+
+    // Select button now prefers directory-based list, falls back if unsupported
+    selectBtn.addEventListener('click', async ()=>{
+      if(!window.showDirectoryPicker){
+        // Browser does not support folder access → original file picker
+        useFileInputFallback();
+        return;
+      }
+      await loadDirectoryFiles();
     });
 
     async function enterWebXR(){
@@ -211,5 +338,3 @@
   </script>
 </body>
 </html>
-
-
