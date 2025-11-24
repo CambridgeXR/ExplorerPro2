@@ -1,8 +1,8 @@
 {
   "name": "VR Explorer Pro",
   "short_name": "Explorer Pro",
-  "start_url": "/Explorer6/index.html",
-  "scope": "/Explorer6/",
+  "start_url": "/ExplorerPro2/index.html",
+  "scope": "/ExplorerPro2/",
   "display": "standalone",
   "theme_color": "#0b3d91",
   "background_color": "#000000",
