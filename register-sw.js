@@ -2,7 +2,7 @@
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', async () => {
     try {
-      const reg = await navigator.serviceWorker.register('./sw.js', { scope: '/Explorer6/' });
+      const reg = await navigator.serviceWorker.register('./sw.js', { scope: '/ExplorerPro2/' });
       console.log('VR Explorer Pro: serviceWorker registered.', reg);
       reg.addEventListener('updatefound', () => {
         const newWorker = reg.installing;
